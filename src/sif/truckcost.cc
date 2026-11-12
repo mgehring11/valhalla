@@ -740,7 +740,17 @@ Cost TruckCost::TransitionCostReverse(const uint32_t idx,
 // assume the maximum speed is used to the destination such that the time
 // estimate is less than the least possible time along roads.
 float TruckCost::AStarCostFactor() const {
-  return kSpeedFactor[top_speed_] * min_linear_cost_factor_;
+  // Scale by the smallest per-meter cost EdgeCost() can produce under the current options;
+  // anything larger overestimates discounted edges (designated truck routes, best density,
+  // use_highways > 0.5) and long bidirectional searches commit to suboptimal corridors.
+  float min_factor = std::min(kDensityFactor[0], std::min(ferry_factor_, rail_ferry_factor_)) +
+                     std::min(0.f, highway_factor_) * kHighwayFactor[0] +
+                     std::min(0.f, toll_factor_) + std::min(0.f, low_class_factor_);
+  min_factor *= kTruckRouteFactor * std::min(1.f, track_factor_) *
+                std::min(1.f, living_street_factor_) * std::min(1.f, service_factor_) *
+                std::min(1.f, closure_factor_);
+  return (kSpeedFactor[top_speed_] * inv_distance_factor_ + distance_factor_) *
+         std::max(0.f, min_factor) * min_linear_cost_factor_;
 }
 
 // Returns the current travel type.
